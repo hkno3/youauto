@@ -20,13 +20,13 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 TEMP_DIR.mkdir(exist_ok=True)
 
 # ─── API 키 ───────────────────────────────────────────────────────────────────
-ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 PEXELS_API_KEY: str = os.getenv("PEXELS_API_KEY", "")
 
-# ─── Claude 설정 ──────────────────────────────────────────────────────────────
-CLAUDE_MODEL = "claude-opus-4-6"
-CLAUDE_MAX_TOKENS = 2048
-CLAUDE_TEMPERATURE = 1.0  # Claude API는 temperature 파라미터를 extended thinking 외에 사용하지 않음
+# ─── Gemini 설정 ──────────────────────────────────────────────────────────────
+GEMINI_MODEL = "gemini-2.5-flash-preview-04-17"
+GEMINI_MAX_TOKENS = 2048
+GEMINI_TEMPERATURE = 1.0
 
 # ─── 영상 형식 설정 (YouTube Shorts: 세로형 9:16) ─────────────────────────────
 VIDEO_WIDTH = 1080

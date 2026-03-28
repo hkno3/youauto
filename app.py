@@ -26,30 +26,28 @@ import config
 
 def load_env_values():
     vals = dotenv_values(ENV_PATH)
-    return vals.get("ANTHROPIC_API_KEY", ""), vals.get("PEXELS_API_KEY", "")
+    return vals.get("GEMINI_API_KEY", ""), vals.get("PEXELS_API_KEY", "")
 
 
-def save_api_keys(anthropic_key: str, pexels_key: str):
+def save_api_keys(gemini_key: str, pexels_key: str):
     """API 키를 .env 파일에 저장"""
-    anthropic_key = anthropic_key.strip()
+    gemini_key = gemini_key.strip()
     pexels_key = pexels_key.strip()
 
     if not ENV_PATH.exists():
         ENV_PATH.write_text("")
 
-    set_key(str(ENV_PATH), "ANTHROPIC_API_KEY", anthropic_key)
+    set_key(str(ENV_PATH), "GEMINI_API_KEY", gemini_key)
     set_key(str(ENV_PATH), "PEXELS_API_KEY", pexels_key)
 
-    # 현재 프로세스 환경변수도 업데이트
-    os.environ["ANTHROPIC_API_KEY"] = anthropic_key
+    os.environ["GEMINI_API_KEY"] = gemini_key
     os.environ["PEXELS_API_KEY"] = pexels_key
 
-    # config 모듈 값도 갱신
-    config.ANTHROPIC_API_KEY = anthropic_key
+    config.GEMINI_API_KEY = gemini_key
     config.PEXELS_API_KEY = pexels_key
 
     status = []
-    status.append("✅ ANTHROPIC_API_KEY " + ("저장됨" if anthropic_key else "⚠️ 비어있음"))
+    status.append("✅ GEMINI_API_KEY " + ("저장됨" if gemini_key else "⚠️ 비어있음"))
     status.append("✅ PEXELS_API_KEY " + ("저장됨" if pexels_key else "⚠️ 비어있음"))
     return "\n".join(status)
 
@@ -72,8 +70,8 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
         yield "❌ 주제를 입력하세요.", None
         return
 
-    if not config.ANTHROPIC_API_KEY:
-        yield "❌ ANTHROPIC_API_KEY가 설정되지 않았습니다.\n'API 키 설정' 탭에서 키를 입력하세요.", None
+    if not config.GEMINI_API_KEY:
+        yield "❌ GEMINI_API_KEY가 설정되지 않았습니다.\n'API 키 설정' 탭에서 키를 입력하세요.", None
         return
 
     if not config.PEXELS_API_KEY:
@@ -170,7 +168,7 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
 # ── UI 구성 ──────────────────────────────────────────────────────────────────
 
 def build_ui():
-    anthropic_key, pexels_key = load_env_values()
+    gemini_key, pexels_key = load_env_values()
 
     with gr.Blocks(
         title="YouAuto - YouTube Shorts 자동화",
@@ -250,27 +248,27 @@ def build_ui():
 
 API 키는 `.env` 파일에 안전하게 저장됩니다.
 
-| 서비스 | 용도 | 발급 링크 |
-|--------|------|-----------|
-| Anthropic | 대본 자동 생성 | [console.anthropic.com](https://console.anthropic.com) |
-| Pexels | 배경 영상 다운로드 | [pexels.com/api](https://www.pexels.com/api) (무료) |
+| 서비스 | 용도 | 무료 여부 | 발급 링크 |
+|--------|------|-----------|-----------|
+| **Google Gemini** | 대본 자동 생성 (gemini-2.5-flash) | ✅ 하루 20회 무료 | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| **Pexels** | 배경 영상 다운로드 | ✅ 완전 무료 | [pexels.com/api](https://www.pexels.com/api) |
                 """)
 
                 with gr.Row():
                     with gr.Column():
-                        anthropic_input = gr.Textbox(
-                            label="Anthropic API Key",
-                            placeholder="sk-ant-...",
-                            value=anthropic_key,
+                        gemini_input = gr.Textbox(
+                            label="Gemini API Key",
+                            placeholder="AIza...",
+                            value=gemini_key,
                             type="password",
-                            info="Claude AI 대본 생성에 사용됩니다",
+                            info="Google AI Studio에서 무료 발급 (하루 20회 무료)",
                         )
                         pexels_input = gr.Textbox(
                             label="Pexels API Key",
                             placeholder="...",
                             value=pexels_key,
                             type="password",
-                            info="배경 영상 다운로드에 사용됩니다 (무료)",
+                            info="배경 영상 다운로드에 사용됩니다 (완전 무료)",
                         )
                         save_keys_btn = gr.Button("💾 API 키 저장", variant="primary")
                         keys_status = gr.Textbox(
@@ -281,7 +279,7 @@ API 키는 `.env` 파일에 안전하게 저장됩니다.
 
                 save_keys_btn.click(
                     fn=save_api_keys,
-                    inputs=[anthropic_input, pexels_input],
+                    inputs=[gemini_input, pexels_input],
                     outputs=keys_status,
                 )
 
