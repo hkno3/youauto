@@ -72,8 +72,13 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
         raise RuntimeError(f"Gemini API 오류 {resp.status_code}: {resp.text}")
 
     raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-    print(f"\n[Gemini 원본 응답]\n{raw_text}\n")  # 터미널에 바로 출력
-    logger.info(f"Gemini 원본 응답:\n{raw_text}")
+
+    # 디버그: 원본 응답을 파일에 저장
+    debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "gemini_debug.txt")
+    with open(debug_path, "w", encoding="utf-8") as f:
+        f.write(raw_text)
+
+    logger.info(f"Gemini 원본 응답 저장됨: {debug_path}")
 
     # JSON 파싱
     try:
