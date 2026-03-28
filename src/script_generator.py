@@ -7,11 +7,9 @@ Pexels 검색에 사용할 영어 키워드를 생성합니다.
 
 import logging
 import re
+import requests
 from dataclasses import dataclass
 from typing import Optional
-
-from google import genai
-from google.genai import types
 
 import sys
 import os
@@ -130,8 +128,6 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
 
     logger.info(f"스크립트 생성 시작 - 주제: '{topic}'")
 
-    client = genai.Client(api_key=key)
-
     system_prompt = """당신은 YouTube Shorts 전문 콘텐츠 크리에이터입니다.
 주어진 주제로 시청자를 즉시 사로잡는 짧고 임팩트 있는 한국어 쇼츠 스크립트를 작성합니다.
 
@@ -154,18 +150,24 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
 위 주제로 YouTube Shorts 스크립트를 작성해주세요.
 키워드는 반드시 영어로, 배경 영상으로 적합한 시각적 요소를 포함하도록 해주세요."""
 
-    logger.debug("Gemini API 호출 중...")
-    response = client.models.generate_content(
-        model=config.GEMINI_MODEL,
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            max_output_tokens=config.GEMINI_MAX_TOKENS,
-            temperature=config.GEMINI_TEMPERATURE,
-        ),
-    )
+    # Gemini REST API 직접 호출 (SDK 버전 문제 우회)
+    url = f"https://generativelanguage.googleapis.com/v1/models/{config.GEMINI_MODEL}:generateContent"
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{"parts": [{"text": user_prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": config.GEMINI_MAX_TOKENS,
+            "temperature": config.GEMINI_TEMPERATURE,
+        },
+    }
 
-    raw_text = response.text
+    logger.debug("Gemini REST API 호출 중...")
+    resp = requests.post(url, json=payload, params={"key": key}, timeout=60)
+
+    if resp.status_code != 200:
+        raise RuntimeError(f"Gemini API 오류 {resp.status_code}: {resp.text}")
+
+    raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
     logger.debug(f"Gemini 응답 수신 (길이: {len(raw_text)}자)")
 
     result = _parse_script_response(raw_text, topic)

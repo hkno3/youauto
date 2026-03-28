@@ -1,4 +1,4 @@
-google-genai>=1.0.0
+# Gemini는 REST API 직접 호출 (requests 사용, SDK 불필요)
 edge-tts>=6.1.9
 requests>=2.31.0
 openai-whisper>=20231117
