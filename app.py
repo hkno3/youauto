@@ -115,8 +115,10 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
             text=script_result.script,
             output_filename="narration.mp3",
         )
+        from src.video_composer import _get_audio_duration
         audio_size = audio_path.stat().st_size / 1024
-        yield log(f"✅ 음성 생성 완료: {audio_path.name} ({audio_size:.1f}KB)\n"), None
+        audio_dur = _get_audio_duration(audio_path)
+        yield log(f"✅ 음성 생성 완료: {audio_path.name} ({audio_size:.1f}KB, 실제길이: {audio_dur:.1f}초)\n"), None
 
         # ── STEP 3: 배경 영상 다운로드 (키워드별 클립)
         progress(0.5, desc="배경 영상 다운로드 중...")
