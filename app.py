@@ -5,8 +5,7 @@ app.py - YouTube Shorts 자동화 웹 UI
 
 import os
 import sys
-import time
-import threading
+import shutil
 from pathlib import Path
 from dotenv import load_dotenv, set_key, dotenv_values
 
@@ -53,19 +52,32 @@ def save_api_keys(gemini_key: str, pexels_key: str):
 
 
 def save_video_settings(whisper_model, tts_voice, tts_rate, max_duration):
-    """영상 설정을 config에 반영"""
+    """영상 설정을 config에 반영합니다."""
     config.WHISPER_MODEL = whisper_model
     config.TTS_VOICE = tts_voice
     config.TTS_RATE = tts_rate
     config.VIDEO_MAX_DURATION = int(max_duration)
-    return f"✅ 설정 저장됨 (Whisper: {whisper_model}, 음성: {tts_voice}, 최대길이: {max_duration}초)"
+    return (
+        f"✅ 설정 저장됨 "
+        f"(Whisper: {whisper_model}, 음성: {tts_voice}, 최대길이: {max_duration}초)"
+    )
 
 
 # ── 파이프라인 실행 ──────────────────────────────────────────────────────────
 
-def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.Progress()):
-    """Gradio UI에서 파이프라인을 단계별로 실행"""
+def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, bgm_file, progress=gr.Progress()):
+    """
+    Gradio UI에서 파이프라인을 단계별로 실행합니다.
 
+    파이프라인 순서:
+      STEP 1: Gemini 대본 생성 (sentences 포함)
+      STEP 2: gTTS 음성 합성
+      STEP 3: 문장별 Pexels 클립 다운로드
+      STEP 4: 클립 이어붙이기 → background.mp4
+      STEP 5: Whisper 단어별 자막 생성 (ASS 포맷)
+      STEP 6: FFmpeg 영상 합성 (배경 + 음성 + ASS 자막 + 선택적 BGM)
+      STEP 7: 썸네일 추출 (compose_video 내부에서 자동)
+    """
     if not topic.strip():
         yield "❌ 주제를 입력하세요.", None
         return
@@ -83,6 +95,16 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
     if not output_name.endswith(".mp4"):
         output_name += ".mp4"
 
+    # BGM 파일 경로 처리 (Gradio File 컴포넌트는 임시 경로 문자열 반환)
+    bgm_path = None
+    if bgm_file is not None:
+        bgm_path = Path(bgm_file) if isinstance(bgm_file, str) else Path(bgm_file.name)
+        if not bgm_path.exists():
+            bgm_path = None
+
+    # temp 디렉토리 초기화
+    config.TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
     log_lines = []
 
     def log(msg):
@@ -91,66 +113,94 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
 
     try:
         # ── STEP 1: 대본 생성
-        progress(0.1, desc="대본 생성 중...")
-        yield log("🤖 [1/5] Gemini AI로 대본 생성 중..."), None
+        progress(0.05, desc="대본 생성 중...")
+        yield log("🤖 [1/6] Gemini AI로 대본 생성 중..."), None
 
         from src.script_generator import generate_script
         script_result = generate_script(topic)
+
+        sentence_summary = ""
+        if script_result.sentences:
+            sentence_summary = "\n\n[문장별 키워드]\n"
+            for i, s in enumerate(script_result.sentences, 1):
+                sentence_summary += f"  [{i}] {s['text'][:30]} → {s.get('keyword', '')}\n"
 
         yield log(
             f"✅ 대본 완성!\n"
             f"   제목: {script_result.title}\n"
             f"   예상 시간: {script_result.estimated_duration}초\n"
-            f"   검색 키워드: {script_result.pexels_keywords}\n"
+            f"   문장 수: {len(script_result.sentences)}개\n"
             f"\n[Gemini 원본 응답]\n{script_result.raw_response}\n"
             f"\n[TTS에 전달할 스크립트]\n{script_result.script}\n"
+            f"{sentence_summary}"
         ), None
 
         # ── STEP 2: 음성 합성
-        progress(0.3, desc="음성 합성 중...")
-        yield log("🔊 [2/5] Google TTS로 음성 생성 중..."), None
+        progress(0.15, desc="음성 합성 중...")
+        yield log("🔊 [2/6] Google TTS로 음성 생성 중..."), None
 
         from src.tts_generator import generate_tts
         audio_path = generate_tts(
             text=script_result.script,
             output_filename="narration.mp3",
         )
+
         from src.video_composer import _get_audio_duration
-        audio_size = audio_path.stat().st_size / 1024
         audio_dur = _get_audio_duration(audio_path)
-        yield log(f"✅ 음성 생성 완료: {audio_path.name} ({audio_size:.1f}KB, 실제길이: {audio_dur:.1f}초)\n"), None
+        audio_size_kb = audio_path.stat().st_size / 1024
+        yield log(
+            f"✅ 음성 생성 완료: {audio_path.name} "
+            f"({audio_size_kb:.1f}KB, 실제길이: {audio_dur:.1f}초)\n"
+        ), None
 
-        # ── STEP 3: 배경 영상 다운로드 (문장별 클립)
-        progress(0.5, desc="배경 영상 다운로드 중...")
-        num_clips = len(script_result.sentences) if script_result.sentences else len(script_result.pexels_keywords)
-        yield log(f"🎞️ [3/5] Pexels에서 클립 {num_clips}개 다운로드 중..."), None
+        # ── STEP 3: 문장별 클립 다운로드
+        progress(0.30, desc="배경 영상 다운로드 중...")
 
-        from src.video_composer import concatenate_clips
         if script_result.sentences:
+            clip_count = len(script_result.sentences)
+            yield log(
+                f"🎞️ [3/6] 문장별 클립 {clip_count}개 다운로드 중...\n"
+                f"   (각 문장에 맞는 영상을 Pexels에서 검색합니다)\n"
+            ), None
+
             from src.video_downloader import download_clips_per_sentence
+            clip_duration = max(5, int(audio_dur / max(clip_count, 1)) + 2)
             clip_paths = download_clips_per_sentence(
                 sentences=script_result.sentences,
                 output_dir=config.TEMP_DIR,
-                clip_duration=8,
+                clip_duration=clip_duration,
             )
         else:
-            from src.video_downloader import download_multiple_videos
             kw_count = len(script_result.pexels_keywords) or 1
+            yield log(
+                f"🎞️ [3/6] 키워드별 클립 {kw_count}개 다운로드 중 (폴백)...\n"
+            ), None
+
+            from src.video_downloader import download_multiple_videos
+            clip_duration = max(5, script_result.estimated_duration // kw_count)
             clip_paths = download_multiple_videos(
                 keywords=script_result.pexels_keywords,
                 output_dir=config.TEMP_DIR,
-                clip_duration=max(5, script_result.estimated_duration // kw_count),
+                clip_duration=clip_duration,
             )
+
         yield log(f"✅ 클립 {len(clip_paths)}개 다운로드 완료\n"), None
 
-        # 클립 이어붙이기
+        # ── STEP 4: 클립 이어붙이기
+        progress(0.50, desc="클립 이어붙이는 중...")
+        yield log("🔗 [4/6] 클립 이어붙이는 중..."), None
+
+        from src.video_composer import concatenate_clips
         concat_path = config.TEMP_DIR / "background_concat.mp4"
         background_path = concatenate_clips(clip_paths, concat_path, audio_dur)
-        yield log(f"✅ 클립 이어붙이기 완료\n"), None
+        yield log(f"✅ 클립 이어붙이기 완료 → {background_path.name}\n"), None
 
-        # ── STEP 4: 자막 생성
-        progress(0.7, desc="자막 생성 중...")
-        yield log(f"📝 [4/5] Whisper({config.WHISPER_MODEL})로 자막 생성 중..."), None
+        # ── STEP 5: Whisper 단어별 자막 생성
+        progress(0.65, desc="자막 생성 중...")
+        yield log(
+            f"📝 [5/6] Whisper({config.WHISPER_MODEL})로 단어별 자막 생성 중...\n"
+            f"   (ASS 포맷, 단어 하나씩 팝업)\n"
+        ), None
 
         from src.subtitle_generator import generate_subtitles
         subtitle_path = generate_subtitles(
@@ -159,31 +209,43 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
         )
         yield log(f"✅ 자막 생성 완료: {subtitle_path.name}\n"), None
 
-        # ── STEP 5: 영상 합성
-        progress(0.9, desc="영상 합성 중...")
-        yield log("🎬 [5/5] FFmpeg으로 최종 영상 합성 중..."), None
+        # ── STEP 6: FFmpeg 영상 합성
+        progress(0.80, desc="영상 합성 중...")
+        bgm_info = f" + BGM({bgm_path.name})" if bgm_path else ""
+        yield log(f"🎬 [6/6] FFmpeg으로 최종 영상 합성 중{bgm_info}..."), None
 
         from src.video_composer import compose_video
-        import shutil
         final_video = compose_video(
             background_path=background_path,
             audio_path=audio_path,
             subtitle_path=subtitle_path,
             output_filename=output_name,
+            bgm_path=bgm_path,
         )
 
         if not keep_temp:
             shutil.rmtree(config.TEMP_DIR, ignore_errors=True)
+            config.TEMP_DIR.mkdir(exist_ok=True)
 
         progress(1.0, desc="완료!")
+
+        thumbnail = config.OUTPUT_DIR / (Path(output_name).stem + "_thumbnail.jpg")
+        thumb_info = f"\n   썸네일: {thumbnail.name}" if thumbnail.exists() else ""
+
+        file_size_mb = final_video.stat().st_size / (1024 * 1024)
         yield log(
             f"\n🎉 완성!\n"
             f"   파일: {final_video}\n"
-            f"   크기: {final_video.stat().st_size / (1024*1024):.1f}MB"
+            f"   크기: {file_size_mb:.1f}MB\n"
+            f"   음성 길이: {audio_dur:.1f}초\n"
+            f"   클립 수: {len(clip_paths)}개"
+            f"{thumb_info}"
         ), str(final_video)
 
     except Exception as e:
-        yield log(f"\n❌ 오류 발생: {e}"), None
+        import traceback
+        tb = traceback.format_exc()
+        yield log(f"\n❌ 오류 발생: {e}\n\n{tb}"), None
 
 
 # ── UI 구성 ──────────────────────────────────────────────────────────────────
@@ -214,8 +276,12 @@ def build_ui():
                             placeholder="shorts_output.mp4",
                             value="shorts_output.mp4",
                         )
+                        bgm_upload = gr.File(
+                            label="배경음악 파일 (선택사항, MP3)",
+                            file_types=[".mp3"],
+                        )
                         keep_temp_check = gr.Checkbox(
-                            label="임시 파일 유지 (음성, 자막 파일)",
+                            label="임시 파일 유지 (클립, 음성, 자막 파일)",
                             value=False,
                         )
                         generate_btn = gr.Button(
@@ -227,7 +293,7 @@ def build_ui():
                     with gr.Column(scale=3):
                         log_output = gr.Textbox(
                             label="진행 상황",
-                            lines=15,
+                            lines=18,
                             interactive=False,
                             placeholder="생성 버튼을 누르면 여기에 진행 상황이 표시됩니다...",
                         )
@@ -238,7 +304,7 @@ def build_ui():
 
                 generate_btn.click(
                     fn=run_pipeline_ui,
-                    inputs=[topic_input, output_name_input, keep_temp_check],
+                    inputs=[topic_input, output_name_input, keep_temp_check, bgm_upload],
                     outputs=[log_output, video_output],
                 )
 
@@ -368,25 +434,29 @@ ffmpeg -version  # 확인
 
 #### 3단계: 영상 생성
 - **🎬 영상 생성** 탭에서 주제 입력 후 `영상 생성 시작` 클릭
+- 배경음악(MP3) 파일을 올리면 BGM이 15% 볼륨으로 자동 믹싱됩니다
 
 ---
 
 ### ⚙️ 자동화 파이프라인
 ```
 주제 입력
-  ↓ Gemini 2.5 Flash → 한국어 쇼츠 대본 + 문장별 키워드 생성
-  ↓ Google TTS (gTTS) → 한국어 음성 합성 (.mp3)
-  ↓ Pexels API        → 문장별 배경 클립 다운로드 + 이어붙이기
-  ↓ Whisper           → 단어별 팝업 자막 생성 (.ass)
-  ↓ FFmpeg            → 영상 + 음성 + 자막 합성 (1080x1920)
+  ↓ Gemini AI    → 한국어 쇼츠 대본 + 문장별 키워드 생성
+  ↓ gTTS         → 한국어 음성 (.mp3)
+  ↓ Pexels API   → 문장별 배경 영상 클립 다운로드
+  ↓ FFmpeg       → 클립 이어붙이기
+  ↓ Whisper      → 단어별 팝업 자막 생성 (ASS 포맷)
+  ↓ FFmpeg       → 영상 + 음성 + ASS자막 + BGM(선택) 합성
+  ↓ FFmpeg       → 썸네일 자동 추출
   ↓
-완성된 Shorts 영상 (MP4) + 썸네일 (.jpg)
+완성된 Shorts 영상 (1080x1920, MP4)
 ```
 
 ---
 
 ### 📁 출력 파일 위치
 - 완성 영상: `output/shorts_output.mp4`
+- 썸네일: `output/shorts_output_thumbnail.jpg`
 - 임시 파일: `output/temp/` (자동 삭제됨)
 
 ---
@@ -398,9 +468,13 @@ ffmpeg -version  # 확인
 - `base`: 균형 잡힘 (권장)
 - `small` ~ `large`: 느리지만 정확
 
-**Q: 영상 생성이 너무 오래 걸려요**
-- Whisper 모델을 `tiny`로 낮춰보세요
-- 처음 실행 시 Whisper 모델 다운로드로 느릴 수 있습니다
+**Q: ASS 자막이란?**
+- 각 단어가 하나씩 나타나는 팝업 방식의 자막입니다.
+- Whisper의 word_timestamps 기능으로 정확한 타이밍을 추출합니다.
+
+**Q: BGM 볼륨 조절은?**
+- 현재 기본 15% 볼륨으로 믹싱됩니다.
+- `config.py`의 `BGM_VOLUME` 값을 수정하면 조절 가능합니다.
                 """)
 
     return demo
