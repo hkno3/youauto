@@ -73,18 +73,34 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
     logger.info(f"Gemini 원본 응답:\n{raw_text}")
 
     # JSON 파싱 (마크다운 코드블록 제거 후)
+    clean = re.sub(r"```[\w]*", "", raw_text).replace("```", "").strip()
+    data = None
+
+    # 시도 1: 정상 JSON 파싱
     try:
-        # ```json ... ``` 또는 ``` ... ``` 블록 제거
-        clean = re.sub(r"```[\w]*", "", raw_text)  # 여는 태그 제거
-        clean = clean.replace("```", "")            # 닫는 태그 제거
-        # JSON 객체 부분만 추출 ({ ... })
         match = re.search(r"\{.*\}", clean, re.DOTALL)
         if match:
-            clean = match.group(0)
-        data = json.loads(clean)
-    except json.JSONDecodeError as e:
-        logger.warning(f"JSON 파싱 실패: {e}")
-        data = {"script": raw_text, "title": topic, "hook": "", "keywords": []}
+            data = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        pass
+
+    # 시도 2: JSON이 잘린 경우 각 필드를 정규식으로 직접 추출
+    if not data:
+        logger.warning("JSON 파싱 실패, 정규식으로 필드 추출 시도")
+        def extract_field(field, text):
+            m = re.search(rf'"{field}"\s*:\s*"(.*?)(?<!\\)"', text, re.DOTALL)
+            return m.group(1).strip() if m else ""
+        def extract_list(field, text):
+            m = re.search(rf'"{field}"\s*:\s*\[(.*?)\]', text, re.DOTALL)
+            if m:
+                return [k.strip().strip('"') for k in m.group(1).split(',') if k.strip()]
+            return []
+        data = {
+            "title":    extract_field("title", clean) or topic,
+            "hook":     extract_field("hook", clean),
+            "script":   extract_field("script", clean),
+            "keywords": extract_list("keywords", clean),
+        }
 
     script   = data.get("script", "").strip()
     title    = data.get("title", f"{topic} 정보").strip()

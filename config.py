@@ -25,7 +25,7 @@ PEXELS_API_KEY: str = os.getenv("PEXELS_API_KEY", "")
 
 # ─── Gemini 설정 ──────────────────────────────────────────────────────────────
 GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_MAX_TOKENS = 2048
+GEMINI_MAX_TOKENS = 8192
 GEMINI_TEMPERATURE = 1.0
 
 # ─── 영상 형식 설정 (YouTube Shorts: 세로형 9:16) ─────────────────────────────
