@@ -97,12 +97,16 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
         from src.script_generator import generate_script
         script_result = generate_script(topic)
 
+        # gemini_debug.txt 읽기
+        debug_file = Path(__file__).parent / "gemini_debug.txt"
+        raw_resp = debug_file.read_text(encoding="utf-8") if debug_file.exists() else "없음"
+
         yield log(
             f"✅ 대본 완성!\n"
             f"   제목: {script_result.title}\n"
             f"   예상 시간: {script_result.estimated_duration}초\n"
             f"   검색 키워드: {script_result.pexels_keywords}\n"
-            f"\n[Gemini 원본 응답]\n{script_result.raw_response}\n"
+            f"\n[Gemini 원본 응답]\n{raw_resp}\n"
             f"\n[파싱된 스크립트]\n{script_result.script}\n"
         ), None
 
