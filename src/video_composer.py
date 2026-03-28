@@ -52,6 +52,49 @@ def _get_audio_duration(audio_path: Path) -> float:
     return float(result.stdout.strip())
 
 
+def concatenate_clips(clip_paths: list, output_path: Path, audio_duration: float) -> Path:
+    """
+    여러 영상 클립을 이어붙여 하나의 배경 영상을 만듭니다.
+
+    Args:
+        clip_paths: 클립 파일 경로 목록
+        output_path: 출력 파일 경로
+        audio_duration: 목표 길이 (음성 길이에 맞춤)
+
+    Returns:
+        이어붙인 영상 파일 경로
+    """
+    # 클립이 1개면 그냥 반환
+    if len(clip_paths) == 1:
+        return clip_paths[0]
+
+    # FFmpeg concat demuxer용 목록 파일 생성
+    list_file = output_path.parent / "concat_list.txt"
+    with open(list_file, "w", encoding="utf-8") as f:
+        for p in clip_paths:
+            f.write(f"file '{str(p).replace(chr(92), '/')}'\n")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(list_file),
+        "-c:v", config.VIDEO_CODEC,
+        "-pix_fmt", config.PIXEL_FORMAT,
+        "-r", str(config.VIDEO_FPS),
+        "-an",  # 오디오 없음 (나중에 합성)
+        str(output_path),
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    list_file.unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        raise RuntimeError(f"클립 이어붙이기 실패: {result.stderr[-500:]}")
+
+    return output_path
+
+
 def compose_video(
     background_path: Path,
     audio_path: Path,

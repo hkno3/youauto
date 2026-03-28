@@ -118,17 +118,25 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
         audio_size = audio_path.stat().st_size / 1024
         yield log(f"✅ 음성 생성 완료: {audio_path.name} ({audio_size:.1f}KB)\n"), None
 
-        # ── STEP 3: 배경 영상 다운로드
+        # ── STEP 3: 배경 영상 다운로드 (키워드별 클립)
         progress(0.5, desc="배경 영상 다운로드 중...")
-        yield log("🎞️ [3/5] Pexels에서 배경 영상 다운로드 중..."), None
+        yield log(f"🎞️ [3/5] Pexels에서 클립 {len(script_result.pexels_keywords)}개 다운로드 중..."), None
 
-        from src.video_downloader import download_background_video
-        background_path = download_background_video(
+        from src.video_downloader import download_multiple_videos
+        from src.video_composer import concatenate_clips
+        clip_paths = download_multiple_videos(
             keywords=script_result.pexels_keywords,
-            output_filename="background.mp4",
-            target_duration=script_result.estimated_duration,
+            output_dir=config.TEMP_DIR,
+            clip_duration=max(5, script_result.estimated_duration // len(script_result.pexels_keywords)),
         )
-        yield log(f"✅ 배경 영상 다운로드 완료: {background_path.name}\n"), None
+        yield log(f"✅ 클립 {len(clip_paths)}개 다운로드 완료\n"), None
+
+        # 클립 이어붙이기
+        from src.video_composer import _get_audio_duration
+        audio_dur = _get_audio_duration(audio_path)
+        concat_path = config.TEMP_DIR / "background_concat.mp4"
+        background_path = concatenate_clips(clip_paths, concat_path, audio_dur)
+        yield log(f"✅ 클립 이어붙이기 완료\n"), None
 
         # ── STEP 4: 자막 생성
         progress(0.7, desc="자막 생성 중...")

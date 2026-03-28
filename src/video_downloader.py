@@ -327,6 +327,50 @@ def download_background_video(
     )
 
 
+def download_multiple_videos(
+    keywords: list,
+    api_key: Optional[str] = None,
+    output_dir: Optional[Path] = None,
+    clip_duration: int = 10,
+) -> list:
+    """
+    키워드마다 영상 클립 1개씩 다운로드합니다.
+
+    Args:
+        keywords: 검색 키워드 목록 (키워드당 클립 1개)
+        api_key: Pexels API 키
+        output_dir: 저장 디렉토리
+        clip_duration: 각 클립 목표 길이 (초)
+
+    Returns:
+        다운로드된 파일 경로 목록
+    """
+    key = api_key or config.PEXELS_API_KEY
+    save_dir = output_dir or config.TEMP_DIR
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    downloaded = []
+    for i, keyword in enumerate(keywords):
+        output_filename = f"clip_{i:02d}.mp4"
+        try:
+            path = download_background_video(
+                keywords=[keyword],
+                output_filename=output_filename,
+                api_key=key,
+                output_dir=save_dir,
+                target_duration=clip_duration,
+            )
+            downloaded.append(path)
+            logger.info(f"클립 {i+1}/{len(keywords)} 다운로드 완료: {keyword}")
+        except Exception as e:
+            logger.warning(f"클립 {i+1} 다운로드 실패 ({keyword}): {e}")
+
+    if not downloaded:
+        raise ValueError("다운로드된 클립이 없습니다.")
+
+    return downloaded
+
+
 if __name__ == "__main__":
     # 단독 실행 테스트
     logging.basicConfig(level=logging.DEBUG, format=config.LOG_FORMAT)
