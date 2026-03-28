@@ -30,7 +30,14 @@ class ScriptResult:
     hook: str
 
 
+def _strip_markdown(line: str) -> str:
+    """마크다운 볼드/이탤릭 마커 제거 (**text** → text)"""
+    return re.sub(r"\*+", "", line).strip()
+
+
 def _parse_script_response(raw_text: str, topic: str) -> ScriptResult:
+    logger.info(f"Gemini 원본 응답:\n{raw_text}")  # 원본 응답 로깅
+
     lines = raw_text.strip().split("\n")
 
     title = ""
@@ -47,43 +54,55 @@ def _parse_script_response(raw_text: str, topic: str) -> ScriptResult:
                 script_lines.append("")
             continue
 
-        if line.startswith("제목:") or line.startswith("TITLE:"):
-            title = re.sub(r"^(제목:|TITLE:)\s*", "", line).strip()
+        # 마크다운 볼드 제거 후 섹션 헤더 확인 (**제목:** → 제목:)
+        clean = _strip_markdown(line)
+
+        if re.match(r"^(제목|TITLE)\s*:", clean):
+            title = re.sub(r"^(제목|TITLE)\s*:\s*", "", clean).strip()
             in_script = False
             in_keywords = False
 
-        elif line.startswith("후킹:") or line.startswith("HOOK:"):
-            hook = re.sub(r"^(후킹:|HOOK:)\s*", "", line).strip()
+        elif re.match(r"^(후킹|HOOK)\s*:", clean):
+            hook = re.sub(r"^(후킹|HOOK)\s*:\s*", "", clean).strip()
             in_script = False
             in_keywords = False
 
-        elif line.startswith("스크립트:") or line.startswith("SCRIPT:"):
+        elif re.match(r"^(스크립트|SCRIPT)\s*:", clean):
             in_script = True
             in_keywords = False
-            remainder = re.sub(r"^(스크립트:|SCRIPT:)\s*", "", line).strip()
+            remainder = re.sub(r"^(스크립트|SCRIPT)\s*:\s*", "", clean).strip()
             if remainder:
                 script_lines.append(remainder)
 
-        elif line.startswith("키워드:") or line.startswith("KEYWORDS:"):
+        elif re.match(r"^(키워드|KEYWORDS?)\s*:", clean):
             in_script = False
             in_keywords = True
-            remainder = re.sub(r"^(키워드:|KEYWORDS:)\s*", "", line).strip()
+            remainder = re.sub(r"^(키워드|KEYWORDS?)\s*:\s*", "", clean).strip()
             if remainder:
                 keywords = [k.strip() for k in re.split(r"[,，]", remainder) if k.strip()]
                 pexels_keywords.extend(keywords)
 
         elif in_script:
-            script_lines.append(line)
+            script_lines.append(clean)
 
         elif in_keywords:
-            keywords = [k.strip() for k in re.split(r"[,，]", line) if k.strip()]
+            keywords = [k.strip() for k in re.split(r"[,，]", clean) if k.strip()]
             pexels_keywords.extend(keywords)
 
     script = "\n".join(script_lines).strip()
 
     if not script:
         logger.warning("스크립트 섹션을 찾지 못했습니다. 전체 응답을 스크립트로 사용합니다.")
-        script = raw_text.strip()
+        # 전체 응답에서 섹션 헤더 줄만 제외하고 본문만 추출
+        body_lines = []
+        for line in lines:
+            clean = _strip_markdown(line.strip())
+            if not clean:
+                continue
+            if re.match(r"^(제목|후킹|스크립트|키워드|TITLE|HOOK|SCRIPT|KEYWORDS?)\s*:", clean):
+                continue
+            body_lines.append(clean)
+        script = "\n".join(body_lines).strip() or raw_text.strip()
 
     if not title:
         title = f"{topic}에 대한 유용한 정보"

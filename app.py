@@ -92,7 +92,7 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
     try:
         # ── STEP 1: 대본 생성
         progress(0.1, desc="대본 생성 중...")
-        yield log("🤖 [1/5] Claude AI로 대본 생성 중..."), None
+        yield log("🤖 [1/5] Gemini AI로 대본 생성 중..."), None
 
         from src.script_generator import generate_script
         script_result = generate_script(topic)
@@ -102,6 +102,7 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
             f"   제목: {script_result.title}\n"
             f"   예상 시간: {script_result.estimated_duration}초\n"
             f"   검색 키워드: {script_result.pexels_keywords}\n"
+            f"\n--- 생성된 스크립트 ---\n{script_result.script}\n---\n"
         ), None
 
         # ── STEP 2: 음성 합성
