@@ -87,7 +87,10 @@ def concatenate_clips(clip_paths: list, output_path: Path, audio_duration: float
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    list_file.unlink(missing_ok=True)
+    try:
+        list_file.unlink(missing_ok=True)
+    except Exception:
+        pass  # Windows 파일 잠금 무시
 
     if result.returncode != 0:
         raise RuntimeError(f"클립 이어붙이기 실패: {result.stderr[-500:]}")
