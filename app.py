@@ -284,24 +284,20 @@ API 키는 `.env` 파일에 안전하게 저장됩니다.
 
                 with gr.Row():
                     with gr.Column():
-                        gr.Markdown("#### 🎙️ 음성 설정 (Edge TTS)")
+                        gr.Markdown("#### 🎙️ 음성 설정 (Google TTS)")
                         tts_voice = gr.Dropdown(
-                            label="한국어 음성",
-                            choices=[
-                                "ko-KR-SunHiNeural",     # 여성 (기본)
-                                "ko-KR-InJoonNeural",    # 남성
-                                "ko-KR-HyunsuNeural",    # 남성 2
-                            ],
-                            value=config.TTS_VOICE,
-                            info="SunHi: 여성, InJoon/Hyunsu: 남성",
+                            label="말하기 속도",
+                            choices=["보통", "느리게"],
+                            value="보통",
+                            info="보통: 일반 속도, 느리게: 천천히",
                         )
                         tts_rate = gr.Slider(
-                            label="말하기 속도",
+                            label="말하기 속도 (미사용)",
                             minimum=-50,
                             maximum=50,
                             value=0,
                             step=5,
-                            info="-50(느림) ~ +50(빠름), 0이 기본값",
+                            info="gTTS는 slow 옵션만 지원합니다",
                         )
 
                     with gr.Column():
