@@ -25,6 +25,7 @@ class ScriptResult:
     pexels_keywords: list[str]
     estimated_duration: int
     hook: str
+    raw_response: str = ""  # Gemini 원본 응답
 
 
 def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
@@ -107,6 +108,7 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
         pexels_keywords=keywords[:5],
         estimated_duration=estimated_duration,
         hook=hook,
+        raw_response=raw_text,
     )
 
     logger.info(

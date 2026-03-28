@@ -102,7 +102,8 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
             f"   제목: {script_result.title}\n"
             f"   예상 시간: {script_result.estimated_duration}초\n"
             f"   검색 키워드: {script_result.pexels_keywords}\n"
-            f"\n--- 생성된 스크립트 ---\n{script_result.script}\n---\n"
+            f"\n[Gemini 원본 응답]\n{script_result.raw_response}\n"
+            f"\n[파싱된 스크립트]\n{script_result.script}\n"
         ), None
 
         # ── STEP 2: 음성 합성
