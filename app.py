@@ -120,23 +120,30 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
         audio_dur = _get_audio_duration(audio_path)
         yield log(f"✅ 음성 생성 완료: {audio_path.name} ({audio_size:.1f}KB, 실제길이: {audio_dur:.1f}초)\n"), None
 
-        # ── STEP 3: 배경 영상 다운로드 (키워드별 클립)
+        # ── STEP 3: 배경 영상 다운로드 (문장별 클립)
         progress(0.5, desc="배경 영상 다운로드 중...")
-        yield log(f"🎞️ [3/5] Pexels에서 클립 {len(script_result.pexels_keywords)}개 다운로드 중..."), None
+        num_clips = len(script_result.sentences) if script_result.sentences else len(script_result.pexels_keywords)
+        yield log(f"🎞️ [3/5] Pexels에서 클립 {num_clips}개 다운로드 중..."), None
 
-        from src.video_downloader import download_multiple_videos
         from src.video_composer import concatenate_clips
-        kw_count = len(script_result.pexels_keywords) or 1
-        clip_paths = download_multiple_videos(
-            keywords=script_result.pexels_keywords,
-            output_dir=config.TEMP_DIR,
-            clip_duration=max(5, script_result.estimated_duration // kw_count),
-        )
+        if script_result.sentences:
+            from src.video_downloader import download_clips_per_sentence
+            clip_paths = download_clips_per_sentence(
+                sentences=script_result.sentences,
+                output_dir=config.TEMP_DIR,
+                clip_duration=8,
+            )
+        else:
+            from src.video_downloader import download_multiple_videos
+            kw_count = len(script_result.pexels_keywords) or 1
+            clip_paths = download_multiple_videos(
+                keywords=script_result.pexels_keywords,
+                output_dir=config.TEMP_DIR,
+                clip_duration=max(5, script_result.estimated_duration // kw_count),
+            )
         yield log(f"✅ 클립 {len(clip_paths)}개 다운로드 완료\n"), None
 
         # 클립 이어붙이기
-        from src.video_composer import _get_audio_duration
-        audio_dur = _get_audio_duration(audio_path)
         concat_path = config.TEMP_DIR / "background_concat.mp4"
         background_path = concatenate_clips(clip_paths, concat_path, audio_dur)
         yield log(f"✅ 클립 이어붙이기 완료\n"), None
@@ -148,7 +155,7 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
         from src.subtitle_generator import generate_subtitles
         subtitle_path = generate_subtitles(
             audio_path=audio_path,
-            output_filename="subtitles.srt",
+            output_dir=config.TEMP_DIR,
         )
         yield log(f"✅ 자막 생성 완료: {subtitle_path.name}\n"), None
 
@@ -350,7 +357,7 @@ API 키는 `.env` 파일에 안전하게 저장됩니다.
 ### 🚀 빠른 시작 가이드
 
 #### 1단계: API 키 설정
-- **🔑 API 키 설정** 탭에서 Anthropic, Pexels 키 입력 후 저장
+- **🔑 API 키 설정** 탭에서 Gemini, Pexels 키 입력 후 저장
 
 #### 2단계: FFmpeg 설치 (필수)
 ```bash
@@ -367,13 +374,13 @@ ffmpeg -version  # 확인
 ### ⚙️ 자동화 파이프라인
 ```
 주제 입력
-  ↓ Claude AI    → 한국어 쇼츠 대본 생성
-  ↓ Edge TTS     → 자연스러운 한국어 음성 (.mp3)
-  ↓ Pexels API   → 관련 배경 영상 자동 다운로드
-  ↓ Whisper      → 자동 자막 생성 (.srt)
-  ↓ FFmpeg       → 영상 + 음성 + 자막 합성
+  ↓ Gemini 2.5 Flash → 한국어 쇼츠 대본 + 문장별 키워드 생성
+  ↓ Google TTS (gTTS) → 한국어 음성 합성 (.mp3)
+  ↓ Pexels API        → 문장별 배경 클립 다운로드 + 이어붙이기
+  ↓ Whisper           → 단어별 팝업 자막 생성 (.ass)
+  ↓ FFmpeg            → 영상 + 음성 + 자막 합성 (1080x1920)
   ↓
-완성된 Shorts 영상 (1080x1920, MP4)
+완성된 Shorts 영상 (MP4) + 썸네일 (.jpg)
 ```
 
 ---

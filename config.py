@@ -39,17 +39,17 @@ VIDEO_CODEC = "libx264"
 AUDIO_CODEC = "aac"
 PIXEL_FORMAT = "yuv420p"
 
-# ─── TTS 설정 (Edge TTS - 한국어) ─────────────────────────────────────────────
-TTS_VOICE = "ko-KR-SunHiNeural"   # 한국어 여성 음성
+# ─── TTS 설정 (gTTS - 한국어) ─────────────────────────────────────────────────
+TTS_VOICE = "ko-KR-SunHiNeural"   # 한국어 여성 음성 (참고용)
 TTS_RATE = "+0%"                   # 말하기 속도 (기본값)
 TTS_VOLUME = "+0%"                 # 볼륨 (기본값)
 TTS_PITCH = "+0Hz"                 # 음높이 (기본값)
 
 # ─── Pexels API 설정 ─────────────────────────────────────────────────────────
 PEXELS_API_URL = "https://api.pexels.com/videos/search"
-PEXELS_VIDEO_MIN_DURATION = 10     # 최소 영상 길이 (초)
+PEXELS_VIDEO_MIN_DURATION = 5      # 최소 영상 길이 (초)
 PEXELS_VIDEO_MAX_DURATION = 120    # 최대 영상 길이 (초)
-PEXELS_VIDEO_MIN_WIDTH = 1080      # 최소 영상 너비
+PEXELS_VIDEO_MIN_WIDTH = 720       # 최소 영상 너비
 PEXELS_PER_PAGE = 15               # 검색 결과 수
 PEXELS_PREFERRED_QUALITY = "hd"   # 선호 화질 (hd, sd, uhd)
 
@@ -58,13 +58,13 @@ WHISPER_MODEL = "base"             # tiny, base, small, medium, large
 WHISPER_LANGUAGE = "ko"           # 한국어
 WHISPER_TASK = "transcribe"       # transcribe(원본 언어) 또는 translate(영어 번역)
 
-# ─── 자막 스타일 설정 ─────────────────────────────────────────────────────────
+# ─── 자막 스타일 설정 (ASS 포맷, 단어별 팝업) ────────────────────────────────
 SUBTITLE_FONT = "NanumGothic"     # 한국어 지원 폰트 (없으면 기본 폰트 사용)
-SUBTITLE_FONT_SIZE = 52            # 폰트 크기
+SUBTITLE_FONT_SIZE = 65            # 폰트 크기
 SUBTITLE_FONT_COLOR = "white"     # 글자 색상
 SUBTITLE_OUTLINE_COLOR = "black"  # 테두리 색상
 SUBTITLE_OUTLINE_WIDTH = 3         # 테두리 두께
-SUBTITLE_MARGIN_V = 120           # 하단 여백 (세로)
+SUBTITLE_MARGIN_V = 150           # 하단 여백 (세로)
 SUBTITLE_MARGIN_H = 60            # 좌우 여백
 SUBTITLE_ALIGNMENT = 2            # ASS 정렬: 2 = 하단 중앙
 
@@ -72,6 +72,10 @@ SUBTITLE_ALIGNMENT = 2            # ASS 정렬: 2 = 하단 중앙
 SCRIPT_LANGUAGE = "ko"            # 스크립트 생성 언어
 SCRIPT_MAX_DURATION = 55          # 목표 낭독 시간 (초) - 영상 길이보다 짧게
 SCRIPT_WORDS_PER_MINUTE = 300     # 한국어 평균 말하기 속도 (분당 단어 수)
+
+# ─── BGM / 썸네일 설정 ────────────────────────────────────────────────────────
+BGM_VOLUME = 0.15                  # BGM 볼륨 (15%)
+THUMBNAIL_TIMESTAMP = 1.0         # 썸네일 추출 시점 (초)
 
 # ─── 로그 설정 ────────────────────────────────────────────────────────────────
 LOG_LEVEL = "INFO"
