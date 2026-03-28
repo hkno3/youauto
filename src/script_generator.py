@@ -10,7 +10,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 import sys
 import os
@@ -129,10 +130,9 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
 
     logger.info(f"스크립트 생성 시작 - 주제: '{topic}'")
 
-    genai.configure(api_key=key)
-    model = genai.GenerativeModel(
-        model_name=config.GEMINI_MODEL,
-        system_instruction="""당신은 YouTube Shorts 전문 콘텐츠 크리에이터입니다.
+    client = genai.Client(api_key=key)
+
+    system_prompt = """당신은 YouTube Shorts 전문 콘텐츠 크리에이터입니다.
 주어진 주제로 시청자를 즉시 사로잡는 짧고 임팩트 있는 한국어 쇼츠 스크립트를 작성합니다.
 
 스크립트 작성 원칙:
@@ -147,8 +147,7 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
 제목: [유튜브 쇼츠 제목, 이모지 포함, 60자 이내]
 후킹: [첫 3초 후킹 문장]
 스크립트: [전체 낭독 스크립트, 자연스러운 구어체]
-키워드: [Pexels 배경영상 검색용 영어 키워드 3~5개, 쉼표 구분]""",
-    )
+키워드: [Pexels 배경영상 검색용 영어 키워드 3~5개, 쉼표 구분]"""
 
     user_prompt = f"""주제: {topic}
 
@@ -156,9 +155,11 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
 키워드는 반드시 영어로, 배경 영상으로 적합한 시각적 요소를 포함하도록 해주세요."""
 
     logger.debug("Gemini API 호출 중...")
-    response = model.generate_content(
-        user_prompt,
-        generation_config=genai.types.GenerationConfig(
+    response = client.models.generate_content(
+        model=config.GEMINI_MODEL,
+        contents=user_prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
             max_output_tokens=config.GEMINI_MAX_TOKENS,
             temperature=config.GEMINI_TEMPERATURE,
         ),
