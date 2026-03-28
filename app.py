@@ -108,7 +108,7 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
 
         # ── STEP 2: 음성 합성
         progress(0.3, desc="음성 합성 중...")
-        yield log("🔊 [2/5] Edge TTS로 음성 생성 중..."), None
+        yield log("🔊 [2/5] Google TTS로 음성 생성 중..."), None
 
         from src.tts_generator import generate_tts
         audio_path = generate_tts(
@@ -124,10 +124,11 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
 
         from src.video_downloader import download_multiple_videos
         from src.video_composer import concatenate_clips
+        kw_count = len(script_result.pexels_keywords) or 1
         clip_paths = download_multiple_videos(
             keywords=script_result.pexels_keywords,
             output_dir=config.TEMP_DIR,
-            clip_duration=max(5, script_result.estimated_duration // len(script_result.pexels_keywords)),
+            clip_duration=max(5, script_result.estimated_duration // kw_count),
         )
         yield log(f"✅ 클립 {len(clip_paths)}개 다운로드 완료\n"), None
 

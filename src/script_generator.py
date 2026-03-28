@@ -74,16 +74,25 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
 
     # JSON 파싱 (마크다운 코드블록 제거 후)
     try:
-        clean = re.sub(r"```(?:json)?|```", "", raw_text).strip()
+        # ```json ... ``` 또는 ``` ... ``` 블록 제거
+        clean = re.sub(r"```[\w]*", "", raw_text)  # 여는 태그 제거
+        clean = clean.replace("```", "")            # 닫는 태그 제거
+        # JSON 객체 부분만 추출 ({ ... })
+        match = re.search(r"\{.*\}", clean, re.DOTALL)
+        if match:
+            clean = match.group(0)
         data = json.loads(clean)
-    except json.JSONDecodeError:
-        logger.warning("JSON 파싱 실패, 전체 텍스트를 스크립트로 사용")
+    except json.JSONDecodeError as e:
+        logger.warning(f"JSON 파싱 실패: {e}")
         data = {"script": raw_text, "title": topic, "hook": "", "keywords": []}
 
     script   = data.get("script", "").strip()
     title    = data.get("title", f"{topic} 정보").strip()
     hook     = data.get("hook", "").strip()
     keywords = data.get("keywords", ["lifestyle", "nature", "health"])
+
+    if not keywords:
+        keywords = ["lifestyle", "nature", "health"]
 
     if not script:
         raise RuntimeError("Gemini가 스크립트를 생성하지 못했습니다.")
