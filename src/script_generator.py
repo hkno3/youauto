@@ -151,7 +151,7 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
 키워드는 반드시 영어로, 배경 영상으로 적합한 시각적 요소를 포함하도록 해주세요."""
 
     # Gemini REST API 직접 호출 (SDK 버전 문제 우회)
-    url = f"https://generativelanguage.googleapis.com/v1/models/{config.GEMINI_MODEL}:generateContent"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{config.GEMINI_MODEL}:generateContent"
     payload = {
         "system_instruction": {"parts": [{"text": system_prompt}]},
         "contents": [{"parts": [{"text": user_prompt}]}],
