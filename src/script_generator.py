@@ -62,7 +62,6 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
         "generationConfig": {
             "maxOutputTokens": config.GEMINI_MAX_TOKENS,
             "temperature": config.GEMINI_TEMPERATURE,
-            "responseMimeType": "application/json",
         },
     }
 
@@ -73,6 +72,7 @@ def generate_script(topic: str, api_key: Optional[str] = None) -> ScriptResult:
         raise RuntimeError(f"Gemini API 오류 {resp.status_code}: {resp.text}")
 
     raw_text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    print(f"\n[Gemini 원본 응답]\n{raw_text}\n")  # 터미널에 바로 출력
     logger.info(f"Gemini 원본 응답:\n{raw_text}")
 
     # JSON 파싱
