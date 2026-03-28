@@ -96,6 +96,12 @@ def generate_tts(
     # 텍스트 전처리: 자막 생성에 방해되는 특수문자 정리
     cleaned_text = _preprocess_text(text)
 
+    # 디버그: TTS에 전달되는 텍스트 파일에 저장
+    debug_path = save_dir / "tts_debug.txt"
+    with open(debug_path, "w", encoding="utf-8") as f:
+        f.write(cleaned_text)
+    logger.info(f"TTS 입력 텍스트 ({len(cleaned_text)}자):\n{cleaned_text}")
+
     # 재시도 로직 (Edge TTS 서버 간헐적 오류 대응)
     last_error = None
     for attempt in range(1, 4):

@@ -119,7 +119,13 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
             text=script_result.script,
             output_filename="narration.mp3",
         )
-        yield log(f"✅ 음성 생성 완료: {audio_path.name}\n"), None
+        tts_debug = config.TEMP_DIR / "tts_debug.txt"
+        tts_text = tts_debug.read_text(encoding="utf-8") if tts_debug.exists() else "없음"
+        audio_size = audio_path.stat().st_size / 1024
+        yield log(
+            f"✅ 음성 생성 완료: {audio_path.name} ({audio_size:.1f}KB)\n"
+            f"\n[TTS에 전달된 텍스트]\n{tts_text}\n"
+        ), None
 
         # ── STEP 3: 배경 영상 다운로드
         progress(0.5, desc="배경 영상 다운로드 중...")
