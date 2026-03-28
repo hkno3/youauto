@@ -96,22 +96,34 @@ def generate_tts(
     # 텍스트 전처리: 자막 생성에 방해되는 특수문자 정리
     cleaned_text = _preprocess_text(text)
 
-    try:
-        # Windows/Linux 환경 모두 호환되는 이벤트 루프 처리
+    # 재시도 로직 (Edge TTS 서버 간헐적 오류 대응)
+    last_error = None
+    for attempt in range(1, 4):
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError("루프가 닫혔습니다.")
-            loop.run_until_complete(
-                _synthesize_async(cleaned_text, output_path, voice, rate, volume, pitch)
-            )
-        except RuntimeError:
-            asyncio.run(
-                _synthesize_async(cleaned_text, output_path, voice, rate, volume, pitch)
-            )
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    raise RuntimeError("루프가 닫혔습니다.")
+                loop.run_until_complete(
+                    _synthesize_async(cleaned_text, output_path, voice, rate, volume, pitch)
+                )
+            except RuntimeError:
+                asyncio.run(
+                    _synthesize_async(cleaned_text, output_path, voice, rate, volume, pitch)
+                )
 
-    except Exception as e:
-        raise RuntimeError(f"TTS 합성 중 오류 발생: {e}") from e
+            if output_path.exists() and output_path.stat().st_size > 0:
+                break  # 성공
+            raise RuntimeError("생성된 파일이 비어있습니다.")
+
+        except Exception as e:
+            last_error = e
+            logger.warning(f"TTS 시도 {attempt}/3 실패: {e}")
+            if attempt < 3:
+                import time
+                time.sleep(2 * attempt)
+    else:
+        raise RuntimeError(f"TTS 합성 중 오류 발생: {last_error}") from last_error
 
     if not output_path.exists() or output_path.stat().st_size == 0:
         raise RuntimeError(f"TTS 파일이 생성되지 않았습니다: {output_path}")
