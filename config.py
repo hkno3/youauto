@@ -24,7 +24,7 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 PEXELS_API_KEY: str = os.getenv("PEXELS_API_KEY", "")
 
 # ─── Gemini 설정 ──────────────────────────────────────────────────────────────
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-1.5-flash"
 GEMINI_MAX_TOKENS = 2048
 GEMINI_TEMPERATURE = 1.0
 
