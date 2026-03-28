@@ -171,15 +171,7 @@ def run_pipeline_ui(topic: str, output_name: str, keep_temp: bool, progress=gr.P
 def build_ui():
     gemini_key, pexels_key = load_env_values()
 
-    with gr.Blocks(
-        title="YouAuto - YouTube Shorts 자동화",
-        theme=gr.themes.Soft(primary_hue="red"),
-        css="""
-        .title-text { text-align: center; margin-bottom: 0.5rem; }
-        .subtitle-text { text-align: center; color: #888; margin-bottom: 1.5rem; }
-        footer { display: none !important; }
-        """
-    ) as demo:
+    with gr.Blocks(title="YouAuto - YouTube Shorts 자동화") as demo:
 
         gr.HTML('<h1 class="title-text">🎬 YouAuto</h1>')
         gr.HTML('<p class="subtitle-text">YouTube Shorts 영상 자동 생성기</p>')
@@ -403,7 +395,12 @@ if __name__ == "__main__":
     demo.launch(
         server_name="127.0.0.1",
         server_port=7860,
-        inbrowser=True,       # 브라우저 자동 열기
+        inbrowser=True,
         show_error=True,
-        favicon_path=None,
+        theme=gr.themes.Soft(primary_hue="red"),
+        css="""
+        .title-text { text-align: center; margin-bottom: 0.5rem; }
+        .subtitle-text { text-align: center; color: #888; margin-bottom: 1.5rem; }
+        footer { display: none !important; }
+        """,
     )
